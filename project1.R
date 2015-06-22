@@ -128,19 +128,6 @@ predictValidationComb <- predict(combModFit, predValidationDf)
 confusionMatrix(predictValidationComb, validationExCor$classe)  #0.9941 accuracy
 
 #================================
-#final test
-finalTest <- read.csv("./data/pml-testing.csv")
-finalTestUsefull <- finalTest[, -c(1:7)]
-finalTestFiltered <- finalTestUsefull[, -nzv]
-finalTestEx <- finalTestFiltered[, -excludeCols]
-finalTestExCor <- finalTestEx[, -corVars]
-#prediction
-predictFinalTestGbm <- predict(modelFitGbm, newdata = finalTestExCor)
-#write to text files
-dir.create("./preds")
-pml_write_files(predictFinalTestGbm, "preds")
-
-#================================
 #write to text function
 pml_write_files = function(x, folder){
     n = length(x)
@@ -149,3 +136,21 @@ pml_write_files = function(x, folder){
         write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
     }
 }
+
+#================================
+#final test
+finalTest <- read.csv("./data/pml-testing.csv")
+finalTestUsefull <- finalTest[, -c(1:7)]
+finalTestFiltered <- finalTestUsefull[, -nzv]
+finalTestEx <- finalTestFiltered[, -excludeCols]
+finalTestExCor <- finalTestEx[, -corVars]
+#prediction
+predictFinalTestRf <- predict(modelFitRf, newdata = finalTestExCor)
+predictFinalTestGbm <- predict(modelFitGbm, newdata = finalTestExCor)
+predictFinalTestLda <- predict(modelFitLda, newdata = finalTestExCor)
+predFinalTestDf <- data.frame(predRf = predictFinalTestRf, predGbm = predictFinalTestGbm, predLda = predictFinalTestLda)
+predictFinalTestComb <- predict(combModFit, newdata = predFinalTestDf)
+predictFinalTestComb
+#write to text files
+dir.create("./preds")
+pml_write_files(predictFinalTestComb, "preds")

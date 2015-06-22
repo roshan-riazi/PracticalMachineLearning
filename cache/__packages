@@ -6,3 +6,9 @@ kernlab
 randomForest
 MASS
 knitr
+foreach
+iterators
+doParallel
+survival
+gbm
+plyr
