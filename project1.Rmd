@@ -131,7 +131,7 @@ We tried 3 models for this dataset. We trained Random Forest (rf) and Gradient B
 
 We used "doParallel" library for parallel processing and since our computer had 8 cores, we used 7 cores to boost our training. We also set the method to "cv" with 10 folds cross validation for parameter tuning (with length equal to 10) and metric approximations.
 
-```{r, cache=TRUE, eval=FALSE}
+```{r, cache=TRUE}
 #first prediction -  RF
 #starting doParallel
 library(doParallel)
@@ -142,29 +142,29 @@ tc <- trainControl(method = "cv", number = 10)
 modelFitRf <- train(classe ~ ., data = trainingExCor, method = "rf", trControl = tc, tuneLength = 10)
 stopCluster(cl)
 modelFitRf$finalModel
-modelFitRf
+#modelFitRf
 predictTrainRf <- predict(modelFitRf, newdata = trainingExCor)
 confusionMatrix(predictTrainRf, trainingExCor$classe)   # 1 accuracy
 predictTestRf <- predict(modelFitRf, newdata = testingExCor)
 confusionMatrix(predictTestRf, testingExCor$classe)     # 0.9924
 ```
 
-By looking at confusion matrix, we can see that our Random Forest model had accuracy of 1 on training data and 0.9924 on testing data.
+By looking at confusion matrix, we can see that our Random Forest model had accuracy of 1 on training data and 0.9924 on testing data. OOB estimate of error rate using 10-fold CV is: 0.71%
 
 ##Gradient Boosting Machine Model
 
 We used "doParallel" library and 10 fold cross validation again.
 
-```{r, cache=TRUE, eval=FALSE}
+```{r, cache=TRUE}
 #second prediction - gbm
 set.seed(1)
 cl <- makeCluster(detectCores()-1)
 registerDoParallel(cl)
 tc <- trainControl(method = "cv", number = 10)
-modelFitGbm <- train(classe ~ ., data = trainingExCor, method = "gbm", trControl = tc, tuneLength = 10)
+modelFitGbm <- train(classe ~ ., data = trainingExCor, method = "gbm", trControl = tc, tuneLength = 10, verbose = FALSE)
 stopCluster(cl)
 modelFitGbm$finalModel
-modelFitGbm
+#modelFitGbm
 predictTrainGbm <- predict(modelFitGbm, newdata = trainingExCor)
 confusionMatrix(predictTrainGbm, trainingExCor$classe)  # 1 accuracy
 predictTestGbm <- predict(modelFitGbm, newdata = testingExCor)
@@ -177,7 +177,7 @@ By looking at confusion matrix, we can see that our Gradient Boosting Machine mo
 
 We used "doParallel" library and 10 fold cross validation again.
 
-```{r, cache=TRUE, eval=FALSE}
+```{r, cache=TRUE}
 #third prediction - lda
 set.seed(1)
 cl <- makeCluster(detectCores()-1)
@@ -185,7 +185,7 @@ registerDoParallel(cl)
 tc <- trainControl(method = "cv", number = 10)
 modelFitLda <- train(classe ~ ., data = trainingExCor, method = "lda", trControl = tc, tuneLength = 10)
 stopCluster(cl)
-modelFitLda$finalModel
+#modelFitLda$finalModel
 modelFitLda
 predictTrainLda <- predict(modelFitLda, newdata = trainingExCor)
 confusionMatrix(predictTrainLda, trainingExCor$classe)  # 0.6912 accuracy
@@ -193,17 +193,21 @@ predictTestLda <- predict(modelFitLda, newdata = testingExCor)
 confusionMatrix(predictTestLda, testingExCor$classe)    # 0.6791 accuracy
 ```
 
-By looking at confusion matrix, we can see that our Linear Discriminant Analysis model had accuracy of 0.6912 on training data and 0.6791 on testing data. So its performance is much worse than "rf" and "gbm" and is not even comparable!
+By looking at confusion matrix, we can see that our Linear Discriminant Analysis model had accuracy of 0.6912 on training data and 0.6791 on testing data. OOB estimate of accuracy for 10-fold CV is: 0.6865677. So its performance is much worse than "rf" and "gbm" and is not even comparable!
 
 #Model Selection - Stacked Model
 
 If we were to select just one of these models, we would select "gbm", as it had the largest accuracy. But we would go a step further and make a stacking from these three models. For this purpose, we use the predictions on testing set and create a data frame with each predictions from each model and the true values of "classe" for testing set. Then we will use a linear SVM to stack these values.
 
-```{r, cache=TRUE, eval=FALSE}
+```{r, cache=TRUE}
 #stacking with svm
 predTestDf <- data.frame(predRf = predictTestRf, predGbm = predictTestGbm, predLda = predictTestLda, classe = testingExCor$classe)
 set.seed(1)
+cl <- makeCluster(detectCores()-1)
+registerDoParallel(cl)
+#tc <- trainControl(method = "cv", number = 10)
 combModFit <- train(classe ~ ., data = predTestDf, method = "svmLinear")
+stopCluster(cl)
 predictTestComb <- predict(combModFit, newdata = predTestDf)
 confusionMatrix(predictTestComb, testingExCor$classe)   # 0.9949 accuracy
 ```
@@ -214,7 +218,7 @@ As we can see, this stacking model has higher accuracy than any of three models 
 
 We will use the stacking model from last section for prediction, so we want to know its out of bag error. We will predict validation set for this purpose:
 
-```{r, eval=FALSE}
+```{r}
 #validation
 #building validation predictions data frame
 predictValidationRf <- predict(modelFitRf, newdata = validationExCor)
@@ -226,7 +230,7 @@ predictValidationComb <- predict(combModFit, predValidationDf)
 confusionMatrix(predictValidationComb, validationExCor$classe)  #0.9941 accuracy
 ```
 
-So we expect our stacked model to have and accuracy of 0.9941 or out of bag error of 0.0059.
+So we expect our stacked model to have an accuracy of 0.9941 or out of bag error of 0.0059.
 
 #Final Test Set Classification
 
@@ -245,7 +249,7 @@ pml_write_files = function(x, folder){
 
 To make prediction on final test set, we should do the same things that we did for our trainig dataset.
 
-```{r, eval=FALSE}
+```{r}
 #final test
 finalTest <- read.csv("./data/pml-testing.csv")
 finalTestUsefull <- finalTest[, -c(1:7)]
@@ -256,16 +260,20 @@ finalTestExCor <- finalTestEx[, -corVars]
 
 Then we can make our prediction using our stacked model:
 
-```{r, eval=FALSE}
+```{r}
 #prediction
-predictFinalTestComb <- predict(combModFit, newdata = finalTestExCor)
+predictFinalTestRf <- predict(modelFitRf, newdata = finalTestExCor)
+predictFinalTestGbm <- predict(modelFitGbm, newdata = finalTestExCor)
+predictFinalTestLda <- predict(modelFitLda, newdata = finalTestExCor)
+predFinalTestDf <- data.frame(predRf = predictFinalTestRf, predGbm = predictFinalTestGbm, predLda = predictFinalTestLda)
+predictFinalTestComb <- predict(combModFit, newdata = predFinalTestDf)
 predictFinalTestComb
 ```
 
 Finally we would use the "pml_write_files" function to write these values to files in a "preds" directory:
 
-```{r, eval=FALSE}
+```{r}
 #write to text files
 dir.create("./preds")
-pml_write_files(predictFinalTestGbm, "preds")
+pml_write_files(predictFinalTestComb, "preds")
 ```
